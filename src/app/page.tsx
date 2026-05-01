@@ -1,30 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
-type Tag = "時短" | "節約" | "がっつり" | "ヘルシー";
-type Difficulty = "初級" | "中級";
-type Recipe = {
-  id: string;
-  name: string;
-  servings: number;
-  ingredients: string[];
-  steps: string[];
-  cookingTime: number;
-  difficulty: Difficulty;
-  tags: Tag[];
-  genre: string;
-  category: string;
-  tips: string;
-};
+import { RECIPES, type Recipe, type Tag } from "./recipes";
 
 type SuggestedRecipe = Recipe & {
   availableIngredients: string[];
   missingIngredients: string[];
+  matchedUserIngredients: string[];
   score: number;
 };
 
 const TAGS: Tag[] = ["時短", "節約", "がっつり", "ヘルシー"];
+const MAX_SUGGESTIONS = 20;
 
 const DEFAULT_SEASONINGS = [
   "塩",
@@ -50,104 +37,6 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   ツナ缶: "ツナ",
   シーチキン: "ツナ",
 };
-
-const RECIPES: Recipe[] = [
-  {
-    id: "recipe_001",
-    name: "豚こまと玉ねぎの卵とじ",
-    servings: 2,
-    ingredients: ["豚こま", "玉ねぎ", "卵", "醤油", "みりん", "砂糖"],
-    steps: [
-      "玉ねぎを薄切りにする。",
-      "フライパンに油をひき、豚こまを中火で炒める。",
-      "豚こまの色が変わったら玉ねぎを加える。",
-      "醤油、みりん、砂糖を加えて軽く煮る。",
-      "溶き卵を回し入れ、卵に火が通ったら完成。",
-    ],
-    cookingTime: 15,
-    difficulty: "初級",
-    tags: ["時短", "節約", "がっつり"],
-    genre: "和食",
-    category: "主菜",
-    tips: "卵は最後に入れると、ふんわり仕上がります。",
-  },
-  {
-    id: "recipe_002",
-    name: "玉ねぎと卵の中華スープ",
-    servings: 2,
-    ingredients: ["玉ねぎ", "卵", "鶏ガラスープの素", "塩", "こしょう"],
-    steps: [
-      "玉ねぎを薄切りにする。",
-      "鍋に水と玉ねぎを入れて中火で煮る。",
-      "玉ねぎが柔らかくなったら鶏ガラスープの素を入れる。",
-      "溶き卵を少しずつ回し入れる。",
-      "塩こしょうで味を調えて完成。",
-    ],
-    cookingTime: 10,
-    difficulty: "初級",
-    tags: ["時短", "節約", "ヘルシー"],
-    genre: "中華",
-    category: "汁物",
-    tips: "卵は少しずつ入れると、ふんわり広がります。",
-  },
-  {
-    id: "recipe_003",
-    name: "キャベツとツナのマヨ和え",
-    servings: 2,
-    ingredients: ["キャベツ", "ツナ", "マヨネーズ", "塩", "こしょう"],
-    steps: [
-      "キャベツを細切りにする。",
-      "耐熱容器に入れて電子レンジで2分ほど加熱する。",
-      "粗熱を取り、水気をしぼる。",
-      "ツナ、マヨネーズ、塩こしょうを加えて混ぜる。",
-      "味を調えたら完成。",
-    ],
-    cookingTime: 8,
-    difficulty: "初級",
-    tags: ["時短", "節約"],
-    genre: "その他",
-    category: "副菜",
-    tips: "キャベツの水気をしっかり切ると、水っぽくなりにくいです。",
-  },
-  {
-    id: "recipe_004",
-    name: "豚こまとキャベツの味噌炒め",
-    servings: 2,
-    ingredients: ["豚こま", "キャベツ", "味噌", "みりん", "酒", "砂糖"],
-    steps: [
-      "キャベツを食べやすい大きさに切る。",
-      "味噌、みりん、酒、砂糖を混ぜる。",
-      "フライパンで豚こまを炒める。",
-      "豚こまに火が通ったらキャベツを加える。",
-      "合わせ調味料を加えて全体に絡めたら完成。",
-    ],
-    cookingTime: 15,
-    difficulty: "初級",
-    tags: ["時短", "節約", "がっつり"],
-    genre: "和食",
-    category: "主菜",
-    tips: "キャベツは炒めすぎない方が食感が残ります。",
-  },
-  {
-    id: "recipe_005",
-    name: "卵チャーハン",
-    servings: 1,
-    ingredients: ["ご飯", "卵", "塩", "こしょう", "醤油", "ごま油"],
-    steps: [
-      "卵を溶いておく。",
-      "フライパンにごま油をひき、卵を入れる。",
-      "卵が半熟のうちにご飯を加えて炒める。",
-      "塩こしょう、醤油で味を調える。",
-      "全体がパラッとしたら完成。",
-    ],
-    cookingTime: 10,
-    difficulty: "初級",
-    tags: ["時短", "節約", "がっつり"],
-    genre: "中華",
-    category: "主菜",
-    tips: "温かいご飯を使うと炒めやすいです。",
-  },
-];
 
 function parseIngredients(input: string): string[] {
   return input
@@ -193,11 +82,17 @@ function getAvailableIngredients(
 function calculateScore(
   recipe: Recipe,
   availableIngredients: string[],
+  userIngredients: string[],
   selectedTags: Tag[]
 ): number {
   const missingIngredients = getMissingIngredients(
     recipe.ingredients,
     availableIngredients
+  );
+
+  const matchedUserIngredients = getAvailableIngredients(
+    recipe.ingredients,
+    userIngredients
   );
 
   let score = 0;
@@ -212,6 +107,9 @@ function calculateScore(
   else if (recipe.cookingTime <= 30) score += 5;
 
   if (recipe.difficulty === "初級") score += 10;
+
+  if (matchedUserIngredients.length === 0) score -= 40;
+  else score += matchedUserIngredients.length * 15;
 
   const matchedTags = recipe.tags.filter((tag) => selectedTags.includes(tag));
   score += matchedTags.length * 10;
@@ -248,18 +146,33 @@ export default function Home() {
         availableIngredients
       );
 
-      const score = calculateScore(recipe, availableIngredients, selectedTags);
+      const score = calculateScore(
+        recipe,
+        availableIngredients,
+        userIngredients,
+        selectedTags
+      );
+
+      const matchedUserIngredients = getAvailableIngredients(
+        recipe.ingredients,
+        userIngredients
+      );
 
       return {
         ...recipe,
         availableIngredients: availableRecipeIngredients,
         missingIngredients,
         score,
+        matchedUserIngredients,
       };
     })
-      .filter((recipe) => recipe.missingIngredients.length <= 2)
+      .filter(
+        (recipe) =>
+          recipe.missingIngredients.length <= 2 &&
+          recipe.matchedUserIngredients.length > 0
+      )
       .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
+      .slice(0, MAX_SUGGESTIONS);
   }, [userIngredients, availableIngredients, selectedTags]);
 
   const selectedRecipe = suggestedRecipes.find(
@@ -338,7 +251,8 @@ export default function Home() {
 
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
           <div>
-            <h2 className="mb-3 text-xl font-bold">おすすめレシピ</h2>
+            <h2 className="mb-1 text-xl font-bold">おすすめレシピ</h2>
+            <p className="mb-3 text-sm text-slate-600">表示件数: {suggestedRecipes.length}件（最大{MAX_SUGGESTIONS}件）</p>
 
             {suggestedRecipes.length === 0 && (
               <div className="rounded-3xl bg-white p-5 text-sm text-slate-600 shadow-sm">
